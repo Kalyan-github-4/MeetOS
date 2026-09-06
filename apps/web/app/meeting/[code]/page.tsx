@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   description: "Live meeting room with chat, transcript and AI summary.",
 }
 
-export default function Home() {
-  return <MeetingRoom code="abc-defg-hij" />
+export default async function MeetingRoomPage({
+  params,
+}: PageProps<"/meeting/[code]">) {
+  const { code } = await params
+
+  return <MeetingRoom code={decodeURIComponent(code)} />
 }
