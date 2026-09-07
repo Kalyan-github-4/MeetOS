@@ -6,32 +6,9 @@
  * meetings are resolved from the API by their code.
  */
 
-export type Participant = {
-  id: string
-  name: string
-  role: string
-  avatarUrl: string
-  micOn: boolean
-  cameraOn: boolean
-  isSpeaking: boolean
-}
+import type { ChatMessage, Participant, TranscriptSegment } from "./types"
 
-export type ChatMessage = {
-  id: string
-  authorId: string
-  authorName: string
-  avatarUrl: string
-  body: string
-  link?: { label: string; href: string }
-  sentAt: string
-  isSelf: boolean
-}
-
-export type TranscriptSegment = {
-  id: string
-  text: string
-  highlighted?: boolean
-}
+export type { ChatMessage, Participant, TranscriptSegment }
 
 export const meeting = {
   title: "Weekly Meeting Room",
