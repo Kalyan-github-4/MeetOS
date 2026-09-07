@@ -1,4 +1,4 @@
-import type { TranscriptSegment } from "@/lib/mock-meeting"
+import type { TranscriptSegment } from "@/lib/types"
 
 export function TranscriptPanel({ segments }: { segments: TranscriptSegment[] }) {
   return (

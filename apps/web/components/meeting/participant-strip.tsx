@@ -7,7 +7,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
-import type { Participant } from "@/lib/mock-meeting"
+import { initials, type Participant } from "@/lib/types"
 import { Icon } from "@/components/ui/icon"
 
 function StateBadge({
@@ -48,13 +48,19 @@ function StateBadge({
 function ParticipantTile({ participant }: { participant: Participant }) {
   return (
     <div className="relative aspect-4/3 w-40 shrink-0 overflow-hidden rounded-3xl bg-muted lg:w-full">
-      <Image
-        src={participant.avatarUrl}
-        alt={participant.name}
-        fill
-        sizes="200px"
-        className="object-cover"
-      />
+      {participant.avatarUrl ? (
+        <Image
+          src={participant.avatarUrl}
+          alt={participant.name}
+          fill
+          sizes="200px"
+          className="object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted text-xl font-semibold text-muted-foreground">
+          {initials(participant.name)}
+        </div>
+      )}
       <div
         aria-hidden
         className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent"

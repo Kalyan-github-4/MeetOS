@@ -1,12 +1,7 @@
-import type { Metadata } from "next"
+import { redirect } from "next/navigation"
+import { auth } from "@clerk/nextjs/server"
 
-import { MeetingRoom } from "@/components/meeting/meeting-room"
-
-export const metadata: Metadata = {
-  title: "Meeting Room · MeetOS",
-  description: "Live meeting room with chat, transcript and AI summary.",
-}
-
-export default function Home() {
-  return <MeetingRoom code="abc-defg-hij" />
+export default async function Home() {
+  const { userId } = await auth()
+  redirect(userId ? "/dashboard" : "/sign-in")
 }

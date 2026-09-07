@@ -1,13 +1,11 @@
 import {
-  activeSpeaker,
   joinRequest,
-  meeting,
   messages,
-  participants,
   summary,
   tasks,
   transcript,
 } from "@/lib/mock-meeting"
+import type { Participant } from "@/lib/types"
 import { ChatPanel } from "@/components/meeting/chat-panel"
 import { JoinRequest } from "@/components/meeting/join-request"
 import { MeetingHeader } from "@/components/meeting/meeting-header"
@@ -17,29 +15,49 @@ import { Stage } from "@/components/meeting/stage"
 import { SummaryPanel } from "@/components/meeting/summary-panel"
 import { TranscriptPanel } from "@/components/meeting/transcript-panel"
 
+type MeetingRoomProps = {
+  code: string
+  title: string
+  subtitle: string
+  /** Everyone currently in the session, the first of whom takes the stage. */
+  participants: Participant[]
+  recording?: boolean
+}
+
 /**
- * The full meeting room screen. Rendered by both `/` and `/meeting/[code]`
- * so the layout has a single definition.
+ * The full meeting room screen.
+ *
+ * Meeting details and participants are real (Phase 3). Chat, transcript and the
+ * AI summary are still placeholders — they arrive in Phases 5 and 6.
  */
-export function MeetingRoom({ code }: { code: string }) {
+export function MeetingRoom({
+  code,
+  title,
+  subtitle,
+  participants,
+  recording = false,
+}: MeetingRoomProps) {
+  const [activeSpeaker, ...others] = participants
   return (
     <div className="flex flex-1 flex-col gap-4 bg-white p-4 lg:h-dvh lg:flex-row lg:overflow-hidden">
       {/* Meeting experience */}
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <MeetingHeader
-          title={meeting.title}
-          subtitle={meeting.subtitle}
-          code={code}
-        />
+        <MeetingHeader title={title} subtitle={subtitle} code={code} />
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-          <ParticipantStrip participants={participants} />
-          <Stage participant={activeSpeaker} />
+          <ParticipantStrip participants={others} />
+          {activeSpeaker ? (
+            <Stage participant={activeSpeaker} />
+          ) : (
+            <div className="flex min-h-72 flex-1 items-center justify-center rounded-3xl bg-muted text-sm text-muted-foreground">
+              Waiting for someone to join…
+            </div>
+          )}
         </div>
 
         <JoinRequest name={joinRequest.name} avatarUrl={joinRequest.avatarUrl} />
         <TranscriptPanel segments={transcript} />
-        <MeetingToolbar recording={meeting.recording} />
+        <MeetingToolbar recording={recording} />
       </div>
 
       {/* Meeting intelligence */}
@@ -47,7 +65,7 @@ export function MeetingRoom({ code }: { code: string }) {
         <SummaryPanel summary={summary} tasks={tasks} />
         <ChatPanel
           messages={messages}
-          participants={[activeSpeaker, ...participants]}
+          participants={participants}
           className="min-h-96 flex-1"
         />
       </aside>

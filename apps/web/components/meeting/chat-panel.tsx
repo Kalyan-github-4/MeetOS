@@ -1,7 +1,7 @@
 import { SentIcon, SmileIcon } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
-import type { ChatMessage, Participant } from "@/lib/mock-meeting"
+import type { ChatMessage, Participant } from "@/lib/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"

@@ -1,7 +1,7 @@
 import Image from "next/image"
 import { cn } from "cn"
 
-import type { Participant } from "@/lib/mock-meeting"
+import { initials, type Participant } from "@/lib/types"
 import { StageControls } from "@/components/meeting/stage-controls"
 
 type StageProps = {
@@ -17,14 +17,20 @@ export function Stage({ participant, className }: StageProps) {
         className
       )}
     >
-      <Image
-        src={participant.avatarUrl}
-        alt={participant.name}
-        fill
-        priority
-        sizes="(max-width: 1024px) 100vw, 60vw"
-        className="object-cover"
-      />
+      {participant.avatarUrl ? (
+        <Image
+          src={participant.avatarUrl}
+          alt={participant.name}
+          fill
+          priority
+          sizes="(max-width: 1024px) 100vw, 60vw"
+          className="object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted text-5xl font-semibold text-muted-foreground">
+          {initials(participant.name)}
+        </div>
+      )}
 
       {/* Legibility scrim behind the name overlay */}
       <div
