@@ -3,12 +3,14 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmitOnError": true
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "noEmit": true
   },
-  "include": ["src"]
+  // Tooling files belong in the program too, otherwise editors open them as
+  // inferred projects without @types/node and report phantom errors.
+  "include": ["src", "drizzle.config.ts"]
 }

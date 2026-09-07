@@ -6,18 +6,25 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js"
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@clerk/backend": "^3.17.1",
     "@fastify/cors": "^11.3.0",
     "@fastify/jwt": "^10.2.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.3",
+    "fastify-plugin": "^6.0.0",
     "ioredis": "^6.0.0",
     "livekit-server-sdk": "^2.18.0",
     "postgres": "^3.4.9",
@@ -25,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
