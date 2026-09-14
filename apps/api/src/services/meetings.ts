@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "./db.ts";
 import { generateMeetingCode } from "../lib/code.ts";
@@ -174,6 +174,61 @@ export async function markParticipantLeft(participantId: string): Promise<void> 
     .update(participants)
     .set({ leftAt: new Date() })
     .where(eq(participants.id, participantId));
+}
+
+export async function countActiveParticipants(
+  sessionId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ count: count() })
+    .from(participants)
+    .where(
+      and(
+        eq(participants.sessionId, sessionId),
+        isNull(participants.leftAt),
+      ),
+    );
+
+  return row?.count ?? 0;
+}
+
+/**
+ * Closes one session and marks its meeting ended.
+ *
+ * Reached when the last participant leaves, which is the common way a call
+ * actually finishes — hosts close the tab far more often than they press End.
+ * Without this a session would stay open forever and its chat would never be
+ * cleaned up.
+ */
+export async function endSession(session: MeetingSession): Promise<void> {
+  const now = new Date();
+
+  await db
+    .update(meetingSessions)
+    .set({ endedAt: now })
+    .where(
+      and(eq(meetingSessions.id, session.id), isNull(meetingSessions.endedAt)),
+    );
+
+  await db
+    .update(meetings)
+    .set({ status: "ended", updatedAt: now })
+    .where(eq(meetings.id, session.meetingId));
+}
+
+/** The sessions a meeting still has open, needed before they are closed. */
+export async function listOpenSessions(
+  meetingId: string,
+): Promise<MeetingSession[]> {
+  return db
+    .select()
+    .from(meetingSessions)
+    .where(
+      and(
+        eq(meetingSessions.meetingId, meetingId),
+        isNull(meetingSessions.endedAt),
+      ),
+    );
 }
 
 export async function endMeeting(meetingId: string): Promise<void> {
