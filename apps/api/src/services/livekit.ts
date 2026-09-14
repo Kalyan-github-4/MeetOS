@@ -31,6 +31,10 @@ export async function createMeetingToken(input: {
     canSubscribe: true,
     // Used for chat and reactions over LiveKit's data channel (Phase 5).
     canPublishData: true,
+    // Lets a participant publish their own attributes — the stand-in figure
+    // they picked before joining, so everyone else can render it. Scoped to
+    // their own record; it grants nothing over anyone else's.
+    canUpdateOwnMetadata: true,
   });
 
   return token.toJwt();
