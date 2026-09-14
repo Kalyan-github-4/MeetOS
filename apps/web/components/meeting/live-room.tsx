@@ -11,7 +11,11 @@ import {
 } from "@livekit/components-react"
 import { Track } from "livekit-client"
 
-import { fetchMeetingToken, type MeetingToken } from "@/lib/livekit"
+import {
+  fetchMeetingToken,
+  leaveMeeting,
+  type MeetingToken,
+} from "@/lib/livekit"
 import { clearParticipant, readParticipant } from "@/lib/meeting-seat"
 import { LiveControls } from "@/components/meeting/live-controls"
 import {
@@ -164,8 +168,21 @@ export function LiveMeetingRoom({
   }, [code, getToken, isLoaded])
 
   const handleLeave = useCallback(() => {
+    // Read the guest token before the seat is forgotten locally — it is what
+    // authenticates the call that releases it server-side.
+    const guestToken = readParticipant(code)?.guestToken ?? null
+
+    void (async () => {
+      try {
+        await leaveMeeting(code, guestToken ?? (await getToken()))
+      } catch {
+        // Releasing the seat is a courtesy to everyone still in the room; it
+        // must never stand between this person and leaving.
+      }
+    })()
+
     clearParticipant(code)
-  }, [code])
+  }, [code, getToken])
 
   if (error) {
     return (

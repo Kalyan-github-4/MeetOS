@@ -35,3 +35,22 @@ export async function fetchMeetingToken(
 
   return (await response.json()) as MeetingToken
 }
+
+/**
+ * Releases this browser's seat.
+ *
+ * Best effort by design: a tab closed without warning never gets here, so the
+ * API also treats a leave as idempotent and nothing depends on this call having
+ * succeeded. What it buys is an accurate participant list — and, when the last
+ * person leaves, the end of the session and the deletion of its chat.
+ */
+export async function leaveMeeting(
+  code: string,
+  authToken: string | null,
+): Promise<void> {
+  await fetch(`${API_URL}/meetings/${encodeURIComponent(code)}/leave`, {
+    method: "POST",
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    keepalive: true,
+  })
+}

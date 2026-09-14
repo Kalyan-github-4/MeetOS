@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { currentUser } from "@clerk/nextjs/server"
 
 import { apiFetch, ApiError } from "@/lib/api"
-import { messages, summary, tasks } from "@/lib/mock-meeting"
+import { summary, tasks } from "@/lib/mock-meeting"
 import { ChatPanel } from "@/components/meeting/chat-panel"
 import { LiveMeetingRoom } from "@/components/meeting/live-room"
 import { PreJoin } from "@/components/meeting/pre-join"
@@ -42,15 +42,11 @@ export default async function MeetingRoomPage({
   const signedInName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null
 
-  // Chat and the AI summary are still placeholders — Phases 5 and 6.
+  // The AI summary is still a placeholder — Phase 6.
   const sidePanels = (
     <>
       <SummaryPanel summary={summary} tasks={tasks} />
-      <ChatPanel
-        messages={messages}
-        participants={[]}
-        className="min-h-96 flex-1"
-      />
+      <ChatPanel code={code} className="min-h-96 flex-1" />
     </>
   )
 

@@ -1,8 +1,26 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useAuth } from "@clerk/nextjs"
+import {
+  useDataChannel,
+  useLocalParticipant,
+  useParticipants,
+} from "@livekit/components-react"
 import { SentIcon, SmileIcon } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
-import type { ChatMessage, Participant } from "@/lib/types"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  CHAT_TOPIC,
+  decodeChat,
+  encodeChat,
+  fetchChatBacklog,
+  formatSentAt,
+  persistChatMessage,
+  type ChatEnvelope,
+} from "@/lib/chat"
+import { readParticipant } from "@/lib/meeting-seat"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
@@ -11,56 +29,185 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 const triggerClassName =
   "rounded-4xl px-4 data-active:bg-primary data-active:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:border-transparent"
 
-function Message({ message }: { message: ChatMessage }) {
+/**
+ * Adds a message to the list, ignoring one already present.
+ *
+ * Ids are allocated by the sender, so the stored backlog and the copy that
+ * arrived over the data channel collide by key rather than duplicating — which
+ * is what makes it safe to merge the two in any order.
+ */
+function mergeMessage(
+  current: ChatEnvelope[],
+  incoming: ChatEnvelope,
+): ChatEnvelope[] {
+  if (current.some((message) => message.id === incoming.id)) return current
+
+  return [...current, incoming].sort((a, b) => a.sentAt.localeCompare(b.sentAt))
+}
+
+function Message({
+  message,
+  isSelf,
+}: {
+  message: ChatEnvelope
+  isSelf: boolean
+}) {
   return (
-    <li
-      className={cn(
-        "flex items-end gap-2",
-        message.isSelf && "flex-row-reverse"
-      )}
-    >
+    <li className={cn("flex items-end gap-2", isSelf && "flex-row-reverse")}>
       <Avatar size="sm" className="mb-0.5">
-        <AvatarImage src={message.avatarUrl} alt="" />
         <AvatarFallback>{message.authorName.charAt(0)}</AvatarFallback>
       </Avatar>
 
       <div
         className={cn(
           "max-w-[80%] rounded-3xl px-3.5 py-2.5",
-          message.isSelf
+          isSelf
             ? "bg-primary text-primary-foreground"
-            : "bg-muted text-foreground"
+            : "bg-muted text-foreground",
         )}
       >
+        {isSelf ? null : (
+          <p className="text-xs font-medium text-muted-foreground">
+            {message.authorName}
+          </p>
+        )}
         <p className="text-sm leading-snug">{message.body}</p>
-        {message.link ? (
-          <a
-            href={message.link.href}
-            className="mt-1 block text-xs break-all text-blue-600 underline underline-offset-2 dark:text-blue-400"
-          >
-            {message.link.label}
-          </a>
-        ) : null}
         <p
           className={cn(
             "mt-1 text-[10px]",
-            message.isSelf ? "text-primary-foreground/60" : "text-muted-foreground"
+            isSelf ? "text-primary-foreground/60" : "text-muted-foreground",
           )}
         >
-          {message.sentAt}
+          {formatSentAt(message.sentAt)}
         </p>
       </div>
     </li>
   )
 }
 
-type ChatPanelProps = {
-  messages: ChatMessage[]
-  participants: Participant[]
+/**
+ * Room chat and the participant list.
+ *
+ * Messages are carried by LiveKit's data channel — that is what makes them
+ * appear instantly — and stored through the API only so a late joiner can be
+ * shown what was said before they arrived. Must render inside `LiveKitRoom`.
+ */
+export function ChatPanel({
+  code,
+  className,
+}: {
+  code: string
   className?: string
-}
+}) {
+  const { getToken } = useAuth()
+  const { localParticipant } = useLocalParticipant()
+  const participants = useParticipants()
 
-export function ChatPanel({ messages, participants, className }: ChatPanelProps) {
+  const [messages, setMessages] = useState<ChatEnvelope[]>([])
+  const [draft, setDraft] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  const receive = useCallback((payload: Uint8Array) => {
+    const message = decodeChat(payload)
+    if (message) setMessages((current) => mergeMessage(current, message))
+  }, [])
+
+  const { send } = useDataChannel(CHAT_TOPIC, (data) => receive(data.payload))
+
+  // A guest presents the token issued at join; a signed-in user is recognised
+  // by their Clerk session. Same rule as connecting to the room itself.
+  const authToken = useCallback(async () => {
+    return readParticipant(code)?.guestToken ?? (await getToken())
+  }, [code, getToken])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadBacklog() {
+      try {
+        const backlog = await fetchChatBacklog(code, await authToken())
+        if (cancelled) return
+
+        // Merged one by one rather than replacing: messages may already have
+        // arrived live while this request was in flight.
+        setMessages((current) =>
+          backlog.reduce(
+            (accumulator, message) => mergeMessage(accumulator, message),
+            current,
+          ),
+        )
+      } catch {
+        // The history is a convenience — losing it should not stop someone
+        // taking part in the conversation happening now.
+      }
+    }
+
+    void loadBacklog()
+    return () => {
+      cancelled = true
+    }
+  }, [authToken, code])
+
+  // Follow the conversation as it grows.
+  useEffect(() => {
+    const list = listRef.current
+    if (list) list.scrollTop = list.scrollHeight
+  }, [messages])
+
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault()
+
+      const body = draft.trim()
+      if (!body) return
+
+      const message: ChatEnvelope = {
+        id: crypto.randomUUID(),
+        authorId: localParticipant.identity,
+        authorName: localParticipant.name || "Someone",
+        body,
+        sentAt: new Date().toISOString(),
+      }
+
+      setDraft("")
+      setError(null)
+      // The data channel does not echo a frame back to its sender.
+      setMessages((current) => mergeMessage(current, message))
+
+      try {
+        await send(encodeChat(message), { reliable: true })
+      } catch {
+        setMessages((current) => current.filter((m) => m.id !== message.id))
+        setDraft(body)
+        setError("Message not sent. Check your connection.")
+        return
+      }
+
+      try {
+        await persistChatMessage(code, await authToken(), {
+          id: message.id,
+          body: message.body,
+        })
+      } catch {
+        // Everyone in the room already has this message; only a later joiner
+        // would miss it, which is not worth interrupting the sender over.
+      }
+    },
+    [authToken, code, draft, localParticipant, send],
+  )
+
+  const roster = useMemo(
+    () =>
+      participants.map((participant) => ({
+        id: participant.identity,
+        name: participant.name || "Guest",
+        isLocal: participant.isLocal,
+        micOn: participant.isMicrophoneEnabled,
+      })),
+    [participants],
+  )
+
   return (
     <section
       aria-label="Room chat"
@@ -72,49 +219,75 @@ export function ChatPanel({ messages, participants, className }: ChatPanelProps)
             Room Chat
           </TabsTrigger>
           <TabsTrigger value="participants" className={triggerClassName}>
-            Participant
+            Participants ({roster.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="chat" className="flex min-h-0 flex-col gap-4">
-          <ul className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-            {messages.map((message) => (
-              <Message key={message.id} message={message} />
-            ))}
+          <ul
+            ref={listRef}
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+          >
+            {messages.length === 0 ? (
+              <li className="m-auto text-center text-sm text-muted-foreground">
+                No messages yet.
+              </li>
+            ) : (
+              messages.map((message) => (
+                <Message
+                  key={message.id}
+                  message={message}
+                  isSelf={message.authorId === localParticipant.identity}
+                />
+              ))
+            )}
           </ul>
 
-          <div className="relative shrink-0">
+          {error ? (
+            <p role="alert" className="shrink-0 text-xs text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="relative shrink-0">
             <span className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
               <Icon icon={SmileIcon} size={17} strokeWidth={1.8} />
             </span>
             <Input
               type="text"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
               placeholder="Type something..."
               aria-label="Message"
+              maxLength={2000}
               className="h-11 bg-muted/60 pr-12 pl-10"
             />
             <Button
+              type="submit"
               size="icon-sm"
+              disabled={draft.trim().length === 0}
               aria-label="Send message"
               className="absolute top-1/2 right-2 -translate-y-1/2"
             >
               <Icon icon={SentIcon} size={15} strokeWidth={1.8} />
             </Button>
-          </div>
+          </form>
         </TabsContent>
 
         <TabsContent value="participants">
           <ul className="flex flex-col gap-3">
-            {participants.map((participant) => (
+            {roster.map((participant) => (
               <li key={participant.id} className="flex items-center gap-2.5">
                 <Avatar size="sm">
-                  <AvatarImage src={participant.avatarUrl} alt="" />
                   <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{participant.name}</span>
+                  <span className="block truncate text-sm">
+                    {participant.name}
+                    {participant.isLocal ? " (you)" : ""}
+                  </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {participant.role}
+                    {participant.micOn ? "Mic on" : "Muted"}
                   </span>
                 </span>
               </li>
