@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const triggerClassName =
-  "rounded-4xl px-4 data-active:bg-primary data-active:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:border-transparent"
+  "rounded-full border-transparent px-3.5 text-ink-muted data-active:bg-ink data-active:text-canvas"
 
 type SummaryPanelProps = {
   summary: string
@@ -12,7 +12,7 @@ export function SummaryPanel({ summary, tasks }: SummaryPanelProps) {
   return (
     <section
       aria-label="Meeting intelligence"
-      className="rounded-4xl bg-card p-4 shadow-sm"
+      className="rounded-2xl border border-hairline p-4"
     >
       <Tabs defaultValue="summary" className="gap-4">
         <TabsList className="self-start">
@@ -30,11 +30,11 @@ export function SummaryPanel({ summary, tasks }: SummaryPanelProps) {
               <li key={task.id} className="flex items-start gap-2.5">
                 <span
                   aria-hidden
-                  className="mt-1.5 size-1.5 shrink-0 rounded-full bg-foreground/30"
+                  className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ember"
                 />
                 <span className="min-w-0">
                   <span className="block text-sm leading-snug">{task.label}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block text-xs text-ink-muted">
                     {task.owner}
                   </span>
                 </span>
@@ -44,7 +44,7 @@ export function SummaryPanel({ summary, tasks }: SummaryPanelProps) {
         </TabsContent>
 
         <TabsContent value="summary">
-          <p className="text-sm leading-relaxed text-muted-foreground">{summary}</p>
+          <p className="text-sm leading-relaxed text-ink-muted">{summary}</p>
         </TabsContent>
       </Tabs>
     </section>

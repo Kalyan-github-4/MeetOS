@@ -10,6 +10,7 @@ import {
 import { SentIcon, SmileIcon } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
+import { AVATAR_ATTRIBUTE, parseAvatarAttribute } from "@/lib/avatars"
 import {
   CHAT_TOPIC,
   decodeChat,
@@ -20,14 +21,14 @@ import {
   type ChatEnvelope,
 } from "@/lib/chat"
 import { readParticipant } from "@/lib/meeting-seat"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ModelAvatar } from "@/components/meeting/model-avatar"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const triggerClassName =
-  "rounded-4xl px-4 data-active:bg-primary data-active:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:border-transparent"
+  "rounded-full border-transparent px-3.5 text-ink-muted data-active:bg-ink data-active:text-canvas"
 
 /**
  * Adds a message to the list, ignoring one already present.
@@ -48,26 +49,30 @@ function mergeMessage(
 function Message({
   message,
   isSelf,
+  avatar,
 }: {
   message: ChatEnvelope
   isSelf: boolean
+  /** Null once the author has left — their figure falls back to the default. */
+  avatar: number | null
 }) {
   return (
     <li className={cn("flex items-end gap-2", isSelf && "flex-row-reverse")}>
-      <Avatar size="sm" className="mb-0.5">
-        <AvatarFallback>{message.authorName.charAt(0)}</AvatarFallback>
-      </Avatar>
+      <ModelAvatar
+        id={message.authorId}
+        name={message.authorName}
+        index={avatar ?? undefined}
+        className="mb-0.5 size-8 shrink-0 overflow-hidden rounded-full"
+      />
 
       <div
         className={cn(
-          "max-w-[80%] rounded-3xl px-3.5 py-2.5",
-          isSelf
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-foreground",
+          "max-w-[80%] rounded-2xl px-3.5 py-2.5",
+          isSelf ? "bg-ink text-canvas" : "bg-ink/5 text-ink",
         )}
       >
         {isSelf ? null : (
-          <p className="text-xs font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-ink-muted">
             {message.authorName}
           </p>
         )}
@@ -75,7 +80,7 @@ function Message({
         <p
           className={cn(
             "mt-1 text-[10px]",
-            isSelf ? "text-primary-foreground/60" : "text-muted-foreground",
+            isSelf ? "text-canvas/60" : "text-ink-muted",
           )}
         >
           {formatSentAt(message.sentAt)}
@@ -204,14 +209,28 @@ export function ChatPanel({
         name: participant.name || "Guest",
         isLocal: participant.isLocal,
         micOn: participant.isMicrophoneEnabled,
+        avatar: parseAvatarAttribute(
+          participant.attributes?.[AVATAR_ATTRIBUTE],
+        ),
       })),
     [participants],
+  )
+
+  // Authors of backlog messages may have left, so this resolves what it can
+  // and lets the rest fall back.
+  const avatarFor = useCallback(
+    (authorId: string) =>
+      roster.find((participant) => participant.id === authorId)?.avatar ?? null,
+    [roster],
   )
 
   return (
     <section
       aria-label="Room chat"
-      className={cn("flex flex-col rounded-4xl bg-card p-4 shadow-sm", className)}
+      className={cn(
+        "flex flex-col rounded-2xl border border-hairline p-4",
+        className,
+      )}
     >
       <Tabs defaultValue="chat" className="min-h-0 flex-1 gap-4">
         <TabsList className="self-start">
@@ -229,7 +248,7 @@ export function ChatPanel({
             className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
           >
             {messages.length === 0 ? (
-              <li className="m-auto text-center text-sm text-muted-foreground">
+              <li className="m-auto text-center text-sm text-ink-muted">
                 No messages yet.
               </li>
             ) : (
@@ -238,6 +257,7 @@ export function ChatPanel({
                   key={message.id}
                   message={message}
                   isSelf={message.authorId === localParticipant.identity}
+                  avatar={avatarFor(message.authorId)}
                 />
               ))
             )}
@@ -250,7 +270,7 @@ export function ChatPanel({
           ) : null}
 
           <form onSubmit={handleSubmit} className="relative shrink-0">
-            <span className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
+            <span className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-muted">
               <Icon icon={SmileIcon} size={17} strokeWidth={1.8} />
             </span>
             <Input
@@ -260,14 +280,14 @@ export function ChatPanel({
               placeholder="Type something..."
               aria-label="Message"
               maxLength={2000}
-              className="h-11 bg-muted/60 pr-12 pl-10"
+              className="h-11 rounded-full border-hairline bg-transparent pr-12 pl-10"
             />
             <Button
               type="submit"
               size="icon-sm"
               disabled={draft.trim().length === 0}
               aria-label="Send message"
-              className="absolute top-1/2 right-2 -translate-y-1/2"
+              className="absolute top-1/2 right-2 -translate-y-1/2 bg-ink text-canvas hover:bg-ink/85"
             >
               <Icon icon={SentIcon} size={15} strokeWidth={1.8} />
             </Button>
@@ -278,15 +298,18 @@ export function ChatPanel({
           <ul className="flex flex-col gap-3">
             {roster.map((participant) => (
               <li key={participant.id} className="flex items-center gap-2.5">
-                <Avatar size="sm">
-                  <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
-                </Avatar>
+                <ModelAvatar
+                  id={participant.id}
+                  name={participant.name}
+                  index={participant.avatar ?? undefined}
+                  className="size-8 shrink-0 overflow-hidden rounded-full"
+                />
                 <span className="min-w-0">
                   <span className="block truncate text-sm">
                     {participant.name}
                     {participant.isLocal ? " (you)" : ""}
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="block truncate text-xs text-ink-muted">
                     {participant.micOn ? "Mic on" : "Muted"}
                   </span>
                 </span>

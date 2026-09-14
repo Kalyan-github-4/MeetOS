@@ -11,6 +11,7 @@ import {
 } from "@livekit/components-react"
 import { Track } from "livekit-client"
 
+import { AVATAR_ATTRIBUTE, parseAvatarAttribute } from "@/lib/avatars"
 import {
   fetchMeetingToken,
   leaveMeeting,
@@ -54,6 +55,7 @@ function useTiles(): { stage: Tile | null; strip: Tile[] } {
     isLocal: p.isLocal,
     micOn: p.isMicrophoneEnabled,
     isSpeaking: p.isSpeaking,
+    avatar: parseAvatarAttribute(p.attributes?.[AVATAR_ATTRIBUTE]),
     video: cameraFor(p.identity),
   }))
 
@@ -69,6 +71,7 @@ function useTiles(): { stage: Tile | null; strip: Tile[] } {
         isLocal: screenShare.participant.isLocal,
         micOn: owner?.micOn ?? false,
         isSpeaking: false,
+        avatar: owner?.avatar ?? null,
         video: screenShare,
       },
       strip: tiles,
@@ -80,6 +83,30 @@ function useTiles(): { stage: Tile | null; strip: Tile[] } {
   const stage = speaking ?? remote ?? tiles[0] ?? null
 
   return { stage, strip: tiles.filter((t) => t.id !== stage?.id) }
+}
+
+/**
+ * Publishes the figure this browser picked, once, on connect.
+ *
+ * The choice lives in the seat rather than on the server, so this is what
+ * carries it to everyone else — without it the room would fall back to the
+ * id-derived default and nobody would see what the picker chose.
+ */
+function AvatarAnnouncer({ code }: { code: string }) {
+  const { localParticipant } = useLocalParticipant()
+
+  useEffect(() => {
+    const chosen = readParticipant(code)?.avatar
+    if (chosen === undefined) return
+
+    localParticipant
+      .setAttributes({ [AVATAR_ATTRIBUTE]: String(chosen) })
+      .catch(() => {
+        // Cosmetic: everyone still sees a figure, just the default one.
+      })
+  }, [code, localParticipant])
+
+  return null
 }
 
 function RoomLayout({
@@ -99,7 +126,7 @@ function RoomLayout({
   const { isMicrophoneEnabled } = useLocalParticipant()
 
   return (
-    <div className="flex flex-1 flex-col gap-4 bg-white p-4 lg:h-dvh lg:flex-row lg:overflow-hidden">
+    <div className="flex flex-1 flex-col gap-5 bg-canvas p-5 text-ink lg:h-dvh lg:flex-row lg:overflow-hidden">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <MeetingHeader title={title} subtitle={subtitle} code={code} />
 
@@ -110,7 +137,7 @@ function RoomLayout({
           </LiveStage>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs text-ink-muted">
           {isMicrophoneEnabled ? "Your mic is on" : "Your mic is muted"}
         </p>
       </div>
@@ -118,6 +145,8 @@ function RoomLayout({
       <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-[360px] lg:overflow-y-auto">
         {sidePanels}
       </aside>
+
+      <AvatarAnnouncer code={code} />
 
       {/* Plays every remote audio track; without it the room is silent. */}
       <RoomAudioRenderer />
@@ -186,10 +215,10 @@ export function LiveMeetingRoom({
 
   if (error) {
     return (
-      <main className="flex flex-1 items-center justify-center p-6">
-        <div className="max-w-sm rounded-2xl border p-6 text-center">
+      <main className="flex flex-1 items-center justify-center bg-canvas p-6 text-ink">
+        <div className="max-w-sm rounded-2xl border border-hairline p-8 text-center">
           <p className="font-medium">Could not join the meeting</p>
-          <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+          <p className="mt-1.5 text-sm text-ink-muted">{error}</p>
         </div>
       </main>
     )
@@ -197,10 +226,10 @@ export function LiveMeetingRoom({
 
   if (!connection) {
     return (
-      <main className="flex flex-1 items-center justify-center p-6">
+      <main className="flex flex-1 items-center justify-center bg-canvas p-6">
         <div
           aria-hidden
-          className="h-64 w-full max-w-3xl animate-pulse rounded-3xl bg-muted"
+          className="h-64 w-full max-w-3xl animate-pulse rounded-2xl bg-ink/5"
         />
         <span className="sr-only">Connecting to the meeting…</span>
       </main>

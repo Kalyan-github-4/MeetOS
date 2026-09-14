@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useSyncExternalStore, type ReactNode } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 
+import { MODEL_COUNT } from "@/lib/avatars"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -10,6 +12,21 @@ import {
   saveParticipant,
   subscribeToSeat,
 } from "@/lib/meeting-seat"
+
+/**
+ * three.js is a large dependency and WebGL cannot render on the server, so the
+ * studio is fetched only once someone is actually looking at this screen — it
+ * never reaches the bundle for a returning participant who goes straight in.
+ */
+const ModelStudio = dynamic(
+  () => import("@/components/meeting/model-studio").then((m) => m.ModelStudio),
+  {
+    ssr: false,
+    loading: () => (
+      <div aria-hidden className="size-full animate-pulse bg-ink/5" />
+    ),
+  },
+)
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
@@ -54,6 +71,12 @@ export function PreJoin({
   const [name, setName] = useState(signedInName ?? "")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Opens on an arbitrary figure so a room does not fill up with whoever is
+  // first in the list. Safe to randomise: this screen never renders on the
+  // server, so there is no markup to mismatch.
+  const [avatar, setAvatar] = useState(() =>
+    Math.floor(Math.random() * MODEL_COUNT),
+  )
 
   async function join() {
     const displayName = name.trim()
@@ -88,6 +111,7 @@ export function PreJoin({
         participantId: result.participant.id,
         displayName: result.participant.displayName,
         guestToken: result.guestToken,
+        avatar,
       })
       // Pull the participant list that now includes us.
       router.refresh()
@@ -102,10 +126,10 @@ export function PreJoin({
   // the page blank or showing the wrong screen.
   if (status === "unknown") {
     return (
-      <main className="flex flex-1 items-center justify-center p-6">
+      <main className="flex flex-1 items-center justify-center bg-canvas p-6">
         <div
           aria-hidden
-          className="h-64 w-full max-w-sm animate-pulse rounded-2xl bg-muted"
+          className="h-64 w-full max-w-sm animate-pulse rounded-2xl bg-ink/5"
         />
         <span className="sr-only">Loading meeting…</span>
       </main>
@@ -115,14 +139,55 @@ export function PreJoin({
   if (status === "joined") return <>{children}</>
 
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl border p-6">
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <main className="flex flex-1 items-center justify-center bg-canvas p-6 text-ink">
+      <div className="w-full max-w-sm rounded-2xl border border-hairline p-8">
+        <p className="flex items-center gap-2.5 text-xs tracking-[0.18em] text-ink-muted uppercase">
+          <span className="size-2 rounded-full border border-ember" />
+          Joining
+        </p>
+
+        <h1 className="mt-5 text-2xl font-medium tracking-tight">{title}</h1>
+        <p className="mt-1.5 text-sm text-ink-muted">
           {hostName ? `Hosted by ${hostName}` : "Ready when you are"}
         </p>
 
-        <label htmlFor="display-name" className="mt-6 block text-sm font-medium">
+        <div className="mt-7 overflow-hidden rounded-2xl border border-hairline">
+          <ModelStudio index={avatar} className="aspect-4/3 w-full" />
+
+          <div className="flex items-center justify-between border-t border-hairline px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setAvatar((current) => current - 1)}
+              aria-label="Previous figure"
+              className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
+            >
+              ‹
+            </button>
+
+            <p className="text-xs tracking-[0.18em] text-ink-muted uppercase">
+              Stand-in {(((avatar % MODEL_COUNT) + MODEL_COUNT) % MODEL_COUNT) + 1}{" "}
+              / {MODEL_COUNT}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setAvatar((current) => current + 1)}
+              aria-label="Next figure"
+              className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-2.5 text-xs text-ink-muted">
+          Shown to everyone whenever your camera is off.
+        </p>
+
+        <label
+          htmlFor="display-name"
+          className="mt-6 block text-sm font-medium"
+        >
           Your name
         </label>
         <Input
@@ -133,21 +198,25 @@ export function PreJoin({
             if (event.key === "Enter") void join()
           }}
           placeholder="e.g. Alex Rivera"
-          className="mt-2"
+          className="mt-2 h-11 rounded-full border-hairline bg-transparent px-4"
           autoFocus
         />
 
         {error ? (
-          <p role="alert" className="mt-2 text-sm text-red-600">
+          <p role="alert" className="mt-2.5 text-sm text-ember">
             {error}
           </p>
         ) : null}
 
-        <Button onClick={() => void join()} disabled={pending} className="mt-4 w-full">
+        <Button
+          onClick={() => void join()}
+          disabled={pending}
+          className="mt-5 h-11 w-full bg-ink text-canvas hover:bg-ink/85"
+        >
           {pending ? "Joining…" : "Join meeting"}
         </Button>
 
-        <p className="mt-3 text-center text-xs text-muted-foreground">
+        <p className="mt-4 text-center text-xs text-ink-muted">
           No account needed to join.
         </p>
       </div>

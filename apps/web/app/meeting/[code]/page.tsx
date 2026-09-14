@@ -3,15 +3,13 @@ import { notFound } from "next/navigation"
 import { currentUser } from "@clerk/nextjs/server"
 
 import { apiFetch, ApiError } from "@/lib/api"
-import { summary, tasks } from "@/lib/mock-meeting"
 import { ChatPanel } from "@/components/meeting/chat-panel"
 import { LiveMeetingRoom } from "@/components/meeting/live-room"
 import { PreJoin } from "@/components/meeting/pre-join"
-import { SummaryPanel } from "@/components/meeting/summary-panel"
 
 export const metadata: Metadata = {
   title: "Meeting Room · MeetOS",
-  description: "Live meeting room with chat, transcript and AI summary.",
+  description: "Live meeting room with video, screen share and chat.",
 }
 
 type MeetingResponse = {
@@ -42,13 +40,9 @@ export default async function MeetingRoomPage({
   const signedInName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null
 
-  // The AI summary is still a placeholder — Phase 6.
-  const sidePanels = (
-    <>
-      <SummaryPanel summary={summary} tasks={tasks} />
-      <ChatPanel code={code} className="min-h-96 flex-1" />
-    </>
-  )
+  // The summary and task panel is out until Phase 6 gives it something real to
+  // show — `summary-panel.tsx` is still there, waiting to be handed live data.
+  const sidePanels = <ChatPanel code={code} className="min-h-96 flex-1" />
 
   return (
     <PreJoin

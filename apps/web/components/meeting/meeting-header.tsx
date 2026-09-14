@@ -1,12 +1,7 @@
-import {
-  ArrowLeft01Icon,
-  GridViewIcon,
-  LayoutListIcon,
-} from "@hugeicons/core-free-icons"
+import Link from "next/link"
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 
 type MeetingHeaderProps = {
@@ -16,6 +11,12 @@ type MeetingHeaderProps = {
   className?: string
 }
 
+/**
+ * The room's title bar.
+ *
+ * Carried by a single rule rather than a filled pill: the stage below is the
+ * only thing here worth a surface of its own.
+ */
 export function MeetingHeader({
   title,
   subtitle,
@@ -25,54 +26,32 @@ export function MeetingHeader({
   return (
     <header
       className={cn(
-        "flex items-center gap-3 rounded-full bg-muted px-3 py-2",
-        className
+        "flex shrink-0 items-center gap-4 border-b border-hairline pb-4",
+        className,
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon"
+      <Link
+        href="/dashboard"
         aria-label="Back to dashboard"
-        className="size-12 shrink-0 rounded-full bg-card"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline transition-colors hover:border-ink"
       >
-        <Icon icon={ArrowLeft01Icon} size={21} strokeWidth={1.8} />
-      </Button>
+        <Icon icon={ArrowLeft01Icon} size={18} strokeWidth={1.8} />
+      </Link>
 
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-semibold tracking-tight">
-          {title}
-        </h1>
-
-        <p className="truncate text-xs text-muted-foreground">
-          {subtitle}
-        </p>
+        <h1 className="truncate text-lg font-medium tracking-tight">{title}</h1>
+        <p className="truncate text-xs text-ink-muted">{subtitle}</p>
       </div>
 
-      <Badge
-        variant="outline"
-        className="hidden font-mono tracking-wide sm:inline-flex"
-      >
-        {code}
-      </Badge>
+      <div className="ml-auto flex shrink-0 items-center gap-4">
+        <span className="flex items-center gap-2 text-xs tracking-[0.18em] text-ink-muted uppercase">
+          <span className="size-1.5 rounded-full bg-ember" />
+          Live
+        </span>
 
-      <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Grid view"
-          className="size-12 shrink-0 rounded-full bg-card"
-        >
-          <Icon icon={GridViewIcon} size={21} strokeWidth={1.8} />
-        </Button>
-
-        <Button
-          size="icon"
-          aria-label="Speaker view"
-          aria-pressed="true"
-          className="size-12 shrink-0 rounded-full"
-        >
-          <Icon icon={LayoutListIcon} size={21} strokeWidth={1.8} />
-        </Button>
+        <span className="hidden rounded-full border border-hairline px-3 py-1.5 font-mono text-xs tracking-widest sm:inline-block">
+          {code}
+        </span>
       </div>
     </header>
   )

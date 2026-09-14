@@ -2,10 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-  useLocalParticipant,
-  useRoomContext,
-} from "@livekit/components-react"
+import { useLocalParticipant, useRoomContext } from "@livekit/components-react"
 import {
   CallEnd01Icon,
   ComputerIcon,
@@ -14,12 +11,48 @@ import {
   Video01Icon,
   VideoOffIcon,
 } from "@hugeicons/core-free-icons"
+import { cn } from "cn"
 
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 
 /**
- * The control rail pinned to the right edge of the stage.
+ * One control. Filled when the device is live, hairline when it is not, so the
+ * state of the room is legible without reading a single label.
+ */
+function Control({
+  label,
+  icon,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string
+  icon: typeof Mic01Icon
+  active: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "flex size-11 items-center justify-center rounded-full border transition-colors disabled:opacity-40",
+        active
+          ? "border-ink bg-ink text-canvas"
+          : "border-hairline bg-canvas text-ink hover:border-ink",
+      )}
+    >
+      <Icon icon={icon} size={18} strokeWidth={1.8} />
+    </button>
+  )
+}
+
+/**
+ * The control bar at the foot of the stage.
  *
  * Toggles read their on/off state from LiveKit rather than local state, so a
  * device that fails to start (permission denied, camera in use) leaves the
@@ -27,8 +60,12 @@ import { Icon } from "@/components/ui/icon"
  */
 export function LiveControls({ onLeave }: { onLeave: () => void }) {
   const room = useRoomContext()
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } =
-    useLocalParticipant()
+  const {
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    isScreenShareEnabled,
+  } = useLocalParticipant()
   const router = useRouter()
   const [busy, setBusy] = useState(false)
 
@@ -59,60 +96,47 @@ export function LiveControls({ onLeave }: { onLeave: () => void }) {
   }
 
   return (
-    <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 flex-col gap-2">
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        disabled={busy}
-        onClick={() => void toggle("mic")}
-        aria-label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
-        aria-pressed={isMicrophoneEnabled}
-        className="bg-card/90 shadow-md backdrop-blur-sm hover:bg-card"
-      >
-        <Icon
+    <div className="absolute inset-x-0 bottom-5 z-10 flex justify-center">
+      <div className="flex items-center gap-2 rounded-full border border-hairline bg-canvas/90 p-2 backdrop-blur-md">
+        <Control
+          label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
           icon={isMicrophoneEnabled ? Mic01Icon : MicOff01Icon}
-          size={18}
-          strokeWidth={1.8}
+          active={isMicrophoneEnabled}
+          disabled={busy}
+          onClick={() => void toggle("mic")}
         />
-      </Button>
 
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        disabled={busy}
-        onClick={() => void toggle("camera")}
-        aria-label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
-        aria-pressed={isCameraEnabled}
-        className="bg-card/90 shadow-md backdrop-blur-sm hover:bg-card"
-      >
-        <Icon
+        <Control
+          label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
           icon={isCameraEnabled ? Video01Icon : VideoOffIcon}
-          size={18}
-          strokeWidth={1.8}
+          active={isCameraEnabled}
+          disabled={busy}
+          onClick={() => void toggle("camera")}
         />
-      </Button>
 
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        disabled={busy}
-        onClick={() => void toggle("screen")}
-        aria-label={isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}
-        aria-pressed={isScreenShareEnabled}
-        className="bg-card/90 shadow-md backdrop-blur-sm hover:bg-card"
-      >
-        <Icon icon={ComputerIcon} size={18} strokeWidth={1.8} />
-      </Button>
+        <Control
+          label={isScreenShareEnabled ? "Stop sharing screen" : "Share screen"}
+          icon={ComputerIcon}
+          active={isScreenShareEnabled}
+          disabled={busy}
+          onClick={() => void toggle("screen")}
+        />
 
-      <Button
-        size="icon-lg"
-        disabled={busy}
-        onClick={() => void leave()}
-        aria-label="Leave meeting"
-        className="bg-destructive text-white shadow-md hover:bg-destructive/90"
-      >
-        <Icon icon={CallEnd01Icon} size={18} strokeWidth={1.8} />
-      </Button>
+        <span aria-hidden className="mx-1 h-6 w-px bg-hairline" />
+
+        {/* The accent is spent here: leaving is the one irreversible thing in
+            the room, and the only control that should be findable at a glance. */}
+        <button
+          type="button"
+          onClick={() => void leave()}
+          disabled={busy}
+          aria-label="Leave meeting"
+          className="flex h-11 items-center gap-2 rounded-full bg-ember px-5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          <Icon icon={CallEnd01Icon} size={17} strokeWidth={1.8} />
+          Leave
+        </button>
+      </div>
     </div>
   )
 }

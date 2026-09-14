@@ -5,7 +5,7 @@ import { Mic01Icon, MicOff01Icon } from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
 import { Icon } from "@/components/ui/icon"
-import { initials } from "@/lib/types"
+import { ModelAvatar } from "@/components/meeting/model-avatar"
 
 export type Tile = {
   /** Participant identity — the participant row id issued at join. */
@@ -14,33 +14,38 @@ export type Tile = {
   isLocal: boolean
   micOn: boolean
   isSpeaking: boolean
-  /** Absent when the camera is off, so the tile falls back to initials. */
+  /** The stand-in they picked, or null to derive one from their id. */
+  avatar: number | null
+  /** Absent when the camera is off, so the tile falls back to their figure. */
   video: TrackReference | null
 }
 
-function Initials({ name, size }: { name: string; size: "sm" | "lg" }) {
+/** Stands in for the camera feed, filling the tile the way video would. */
+function CameraOff({ tile }: { tile: Tile }) {
   return (
-    <div
-      className={cn(
-        "absolute inset-0 flex items-center justify-center bg-muted font-semibold text-muted-foreground",
-        size === "lg" ? "text-5xl" : "text-xl",
-      )}
-    >
-      {initials(name)}
-    </div>
+    <ModelAvatar
+      id={tile.id}
+      name={tile.name}
+      index={tile.avatar ?? undefined}
+      className="absolute inset-0 size-full object-cover"
+    />
   )
 }
 
+/**
+ * Badges and labels that sit over video keep their own dark treatment — a
+ * hairline would vanish against whatever the camera happens to be pointing at.
+ */
 function MicBadge({ micOn }: { micOn: boolean }) {
   return (
     <span
       title={micOn ? "Microphone on" : "Microphone muted"}
-      className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white shadow-[0_2px_8px_rgba(0,0,0,0.25)] backdrop-blur-md"
+      className="inline-flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"
     >
       <span className="sr-only">
         {micOn ? "Microphone on" : "Microphone muted"}
       </span>
-      <Icon icon={micOn ? Mic01Icon : MicOff01Icon} size={13} strokeWidth={2} />
+      <Icon icon={micOn ? Mic01Icon : MicOff01Icon} size={12} strokeWidth={2} />
     </span>
   )
 }
@@ -58,12 +63,12 @@ export function LiveStage({
   return (
     <div
       className={cn(
-        "relative isolate min-h-72 flex-1 overflow-hidden rounded-3xl bg-muted",
+        "relative isolate min-h-72 flex-1 overflow-hidden rounded-2xl border border-hairline bg-ink/3",
         className,
       )}
     >
       {tile === null ? (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-ink-muted">
           Waiting for someone to join…
         </div>
       ) : tile.video ? (
@@ -72,20 +77,22 @@ export function LiveStage({
           className="absolute inset-0 size-full object-cover"
         />
       ) : (
-        <Initials name={tile.name} size="lg" />
+        <CameraOff tile={tile} />
       )}
 
       {tile ? (
         <>
           <div
             aria-hidden
-            className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/55 to-transparent"
+            className="absolute inset-x-0 top-0 h-28 bg-linear-to-b from-black/45 to-transparent"
           />
           <div className="absolute top-5 left-5 z-10 text-white">
-            <p className="text-[11px] font-medium tracking-wide text-white/75">
-              {tile.isLocal ? "You" : "In this meeting"}
+            <p className="text-[10px] tracking-[0.18em] text-white/70 uppercase">
+              {tile.isLocal ? "You" : "Speaking"}
             </p>
-            <p className="text-lg font-semibold tracking-tight">{tile.name}</p>
+            <p className="mt-1 text-lg font-medium tracking-tight">
+              {tile.name}
+            </p>
           </div>
         </>
       ) : null}
@@ -105,8 +112,10 @@ export function LiveParticipantStrip({ tiles }: { tiles: Tile[] }) {
         <div
           key={tile.id}
           className={cn(
-            "relative aspect-4/3 w-40 shrink-0 overflow-hidden rounded-3xl bg-muted lg:w-full",
-            tile.isSpeaking && "ring-2 ring-primary",
+            "relative aspect-4/3 w-40 shrink-0 overflow-hidden rounded-xl border bg-ink/3 lg:w-full",
+            // The accent marks who is talking — the one thing in the room that
+            // changes on its own and is worth the eye being pulled to.
+            tile.isSpeaking ? "border-ember" : "border-hairline",
           )}
         >
           {tile.video ? (
@@ -115,16 +124,16 @@ export function LiveParticipantStrip({ tiles }: { tiles: Tile[] }) {
               className="absolute inset-0 size-full object-cover"
             />
           ) : (
-            <Initials name={tile.name} size="sm" />
+            <CameraOff tile={tile} />
           )}
 
           <div
             aria-hidden
-            className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent"
+            className="absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-black/55 to-transparent"
           />
 
-          <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-            <p className="min-w-0 truncate text-sm font-medium text-white">
+          <div className="absolute inset-x-3 bottom-2.5 flex items-end justify-between gap-2">
+            <p className="min-w-0 truncate text-xs font-medium text-white">
               {tile.isLocal ? `${tile.name} (you)` : tile.name}
             </p>
             <MicBadge micOn={tile.micOn} />
