@@ -25,6 +25,7 @@ import {
   type Tile,
 } from "@/components/meeting/live-tiles"
 import { MeetingHeader } from "@/components/meeting/meeting-header"
+import { NetworkStatus } from "@/components/meeting/network-status"
 
 /**
  * Builds the tiles shown on stage and in the strip.
@@ -126,7 +127,12 @@ function RoomLayout({
   const { isMicrophoneEnabled } = useLocalParticipant()
 
   return (
-    <div className="flex flex-1 flex-col gap-5 bg-canvas p-5 text-ink lg:h-dvh lg:flex-row lg:overflow-hidden">
+  <div className="relative flex flex-1 flex-col gap-5 bg-canvas p-5 text-ink lg:h-dvh lg:flex-row lg:overflow-hidden">
+
+    {/* Network quality indicator */}
+    <div className="absolute right-5 top-5 z-50">
+      <NetworkStatus />
+    </div>
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <MeetingHeader title={title} subtitle={subtitle} code={code} />
 

@@ -22,7 +22,9 @@ type MeetingResponse = {
 
 export default async function MeetingRoomPage({
   params,
-}: PageProps<"/meeting/[code]">) {
+}: {
+  params: Promise<{ code: string }>
+}) {
   const { code: rawCode } = await params
   const code = decodeURIComponent(rawCode)
 
