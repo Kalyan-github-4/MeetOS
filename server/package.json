@@ -35,5 +35,9 @@
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
+  },
+  "optionalDependencies": {
+    "@typescript/typescript-linux-x64": "^7.0.2",
+    "@typescript/typescript-win32-x64": "^7.0.2"
   }
 }
