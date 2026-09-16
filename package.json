@@ -4,14 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,magenta -k \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "npm run dev --workspace apps/api",
-    "dev:web": "npm run dev --workspace apps/web",
-    "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
-    "lint": "npm run lint --workspace apps/web",
-    "db:migrate": "npm run db:migrate --workspace apps/api",
-    "db:seed": "npm run db:seed --workspace apps/api",
-    "db:studio": "npm run db:studio --workspace apps/api"
+    "dev": "concurrently -n server,client -c blue,magenta -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace server && npm run build --workspace client",
+    "lint": "npm run lint --workspace client",
+    "db:migrate": "npm run db:migrate --workspace server",
+    "db:seed": "npm run db:seed --workspace server",
+    "db:studio": "npm run db:studio --workspace server"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +19,8 @@
   "type": "commonjs",
   "private": "true",
   "workspaces": [
-    "apps/*"
+    "server",
+    "client"
   ],
   "devDependencies": {
     "concurrently": "^10.0.5"

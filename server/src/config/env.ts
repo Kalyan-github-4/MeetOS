@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 // In development the API is started from a shell that has no env of its own, so
-// load apps/api/.env. In production the platform injects the variables and no
+// load server/.env. In production the platform injects the variables and no
 // file exists — a missing file is not an error, a malformed one is.
 const envFile = fileURLToPath(new URL("../../.env", import.meta.url));
 
