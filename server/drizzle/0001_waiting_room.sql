@@ -1,0 +1,2 @@
+CREATE TYPE "public"."participant_status" AS ENUM('waiting', 'admitted', 'denied', 'removed');--> statement-breakpoint
+ALTER TABLE "participants" ADD COLUMN "status" "participant_status" DEFAULT 'admitted' NOT NULL;
