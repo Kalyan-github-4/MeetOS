@@ -200,4 +200,16 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 no longer gives buttons a pointer; restore it everywhere
+     rather than repeating `cursor-pointer` on every control. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  select:not(:disabled),
+  label:has(> select:not(:disabled)) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
 }

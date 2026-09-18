@@ -1,10 +1,22 @@
 "use client"
 
-import { useState, useSyncExternalStore, type ReactNode } from "react"
+import {
+  useCallback,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
 
 import { MODEL_COUNT } from "@/lib/avatars"
+import {
+  readMediaPrefs,
+  saveMediaPrefs,
+  type MediaPrefs,
+} from "@/lib/media-prefs"
+import { DevicePreview } from "@/components/meeting/device-preview"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -67,6 +79,7 @@ export function PreJoin({
   children: ReactNode
 }) {
   const router = useRouter()
+  const { getToken } = useAuth()
   const status = useJoinStatus(code)
   const [name, setName] = useState(signedInName ?? "")
   const [pending, setPending] = useState(false)
@@ -77,6 +90,14 @@ export function PreJoin({
   const [avatar, setAvatar] = useState(() =>
     Math.floor(Math.random() * MODEL_COUNT),
   )
+  // Read lazily for the same reason: this form only ever renders client-side.
+  const [media, setMedia] = useState<MediaPrefs>(readMediaPrefs)
+
+  // Stable, because the preview reopens devices whenever it changes.
+  const changeMedia = useCallback((change: Partial<MediaPrefs>) => {
+    setMedia((current) => ({ ...current, ...change }))
+    saveMediaPrefs(change)
+  }, [])
 
   async function join() {
     const displayName = name.trim()
@@ -89,9 +110,15 @@ export function PreJoin({
     setError(null)
 
     try {
+      // Signed-in callers must say who they are: it is what makes the host
+      // the host, and lets them in without waiting at their own door.
+      const authToken = await getToken()
       const response = await fetch(`${API_URL}/meetings/${code}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({ displayName }),
       })
 
@@ -140,7 +167,7 @@ export function PreJoin({
 
   return (
     <main className="flex flex-1 items-center justify-center bg-canvas p-6 text-ink">
-      <div className="w-full max-w-sm rounded-2xl border border-hairline p-8">
+      <div className="w-full max-w-md rounded-2xl border border-hairline p-6 sm:p-8">
         <p className="flex items-center gap-2.5 text-xs tracking-[0.18em] text-ink-muted uppercase">
           <span className="size-2 rounded-full border border-ember" />
           Joining
@@ -151,37 +178,44 @@ export function PreJoin({
           {hostName ? `Hosted by ${hostName}` : "Ready when you are"}
         </p>
 
-        <div className="mt-7 overflow-hidden rounded-2xl border border-hairline">
-          <ModelStudio index={avatar} className="aspect-4/3 w-full" />
+        <div className="mt-7">
+          <DevicePreview
+            prefs={media}
+            onChange={changeMedia}
+            fallback={
+              <ModelStudio index={avatar} className="absolute inset-0 size-full" />
+            }
+            footer={
+              <div className="flex items-center justify-between border-t border-hairline px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => setAvatar((current) => current - 1)}
+                  aria-label="Previous figure"
+                  className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
+                >
+                  ‹
+                </button>
 
-          <div className="flex items-center justify-between border-t border-hairline px-3 py-2">
-            <button
-              type="button"
-              onClick={() => setAvatar((current) => current - 1)}
-              aria-label="Previous figure"
-              className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
-            >
-              ‹
-            </button>
+                <p className="text-xs tracking-[0.18em] text-ink-muted uppercase">
+                  Stand-in {(((avatar % MODEL_COUNT) + MODEL_COUNT) % MODEL_COUNT) + 1}{" "}
+                  / {MODEL_COUNT}
+                </p>
 
-            <p className="text-xs tracking-[0.18em] text-ink-muted uppercase">
-              Stand-in {(((avatar % MODEL_COUNT) + MODEL_COUNT) % MODEL_COUNT) + 1}{" "}
-              / {MODEL_COUNT}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setAvatar((current) => current + 1)}
-              aria-label="Next figure"
-              className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
-            >
-              ›
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setAvatar((current) => current + 1)}
+                  aria-label="Next figure"
+                  className="flex size-8 items-center justify-center rounded-full border border-hairline text-sm transition-colors hover:border-ink"
+                >
+                  ›
+                </button>
+              </div>
+            }
+          />
         </div>
 
         <p className="mt-2.5 text-xs text-ink-muted">
-          Shown to everyone whenever your camera is off.
+          Your stand-in is shown to everyone whenever your camera is off.
         </p>
 
         <label

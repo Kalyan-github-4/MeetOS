@@ -1,38 +1,53 @@
+"use client"
+
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { ModelAvatar } from "@/components/meeting/model-avatar"
 
-type JoinRequestProps = {
+/** One knock at the door, with the host's two answers. */
+export function JoinRequest({
+  id,
+  name,
+  busy,
+  onAdmit,
+  onDeny,
+}: {
+  id: string
   name: string
-  avatarUrl: string
-}
-
-export function JoinRequest({ name, avatarUrl }: JoinRequestProps) {
+  busy: boolean
+  onAdmit: () => void
+  onDeny: () => void
+}) {
   return (
-    <div className="flex items-center gap-3 rounded-4xl bg-card px-3 py-2 shadow-sm">
-      <Avatar size="sm">
-        <AvatarImage src={avatarUrl} alt="" />
-        <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-      </Avatar>
-
+    <div className="flex items-center gap-3 rounded-full border border-hairline bg-canvas py-1.5 pr-1.5 pl-1.5">
+      <ModelAvatar
+        id={id}
+        name={name}
+        className="size-8 shrink-0 overflow-hidden rounded-full"
+      />
       <p className="min-w-0 flex-1 truncate text-sm">
         <span className="font-medium">{name}</span>
-        <span className="text-muted-foreground"> wants to join the meeting</span>
+        <span className="text-ink-muted"> wants to join</span>
       </p>
-
-      <Button
-        variant="ghost"
-        size="icon-sm"
+      <button
+        type="button"
+        onClick={onDeny}
+        disabled={busy}
         aria-label={`Deny ${name}`}
-        className="text-destructive hover:bg-destructive/10"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors hover:border-ember hover:text-ember disabled:opacity-40"
       >
         <Icon icon={Cancel01Icon} size={16} strokeWidth={2} />
-      </Button>
-      <Button size="icon-sm" aria-label={`Admit ${name}`}>
-        <Icon icon={Tick02Icon} size={16} strokeWidth={2} />
-      </Button>
+      </button>
+      <button
+        type="button"
+        onClick={onAdmit}
+        disabled={busy}
+        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-medium text-canvas transition-opacity hover:opacity-85 disabled:opacity-40"
+      >
+        <Icon icon={Tick02Icon} size={15} strokeWidth={2} />
+        Admit
+      </button>
     </div>
   )
 }

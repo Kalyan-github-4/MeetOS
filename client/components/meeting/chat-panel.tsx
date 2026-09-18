@@ -7,7 +7,12 @@ import {
   useLocalParticipant,
   useParticipants,
 } from "@livekit/components-react"
-import { SentIcon, SmileIcon } from "@hugeicons/core-free-icons"
+import {
+  MicOff01Icon,
+  SentIcon,
+  SmileIcon,
+  UserRemove01Icon,
+} from "@hugeicons/core-free-icons"
 import { cn } from "cn"
 
 import { AVATAR_ATTRIBUTE, parseAvatarAttribute } from "@/lib/avatars"
@@ -20,6 +25,7 @@ import {
   persistChatMessage,
   type ChatEnvelope,
 } from "@/lib/chat"
+import { useHostControls } from "@/lib/host-controls"
 import { readParticipant } from "@/lib/meeting-seat"
 import { ModelAvatar } from "@/components/meeting/model-avatar"
 import { Button } from "@/components/ui/button"
@@ -91,6 +97,85 @@ function Message({
 }
 
 /**
+ * The host's mute and remove buttons beside one person. Removing asks twice —
+ * it disconnects them — and the question withdraws itself after a few seconds.
+ */
+function HostActions({
+  id,
+  name,
+  micOn,
+}: {
+  id: string
+  name: string
+  micOn: boolean
+}) {
+  const { moderate } = useHostControls()
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!confirming) return
+    const timer = window.setTimeout(() => setConfirming(false), 4000)
+    return () => window.clearTimeout(timer)
+  }, [confirming])
+
+  async function act(action: "mute" | "remove") {
+    if (action === "remove" && !confirming) {
+      setConfirming(true)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await moderate(id, action)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "That did not work.")
+    } finally {
+      setBusy(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+      {error ? (
+        <span role="alert" className="max-w-28 truncate text-xs text-ember" title={error}>
+          {error}
+        </span>
+      ) : null}
+      {micOn ? (
+        <button
+          type="button"
+          onClick={() => void act("mute")}
+          disabled={busy}
+          aria-label={`Mute ${name}`}
+          title={`Mute ${name}`}
+          className="flex size-8 items-center justify-center rounded-full border border-hairline transition-colors hover:border-ink disabled:opacity-40"
+        >
+          <Icon icon={MicOff01Icon} size={14} strokeWidth={1.8} />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => void act("remove")}
+        disabled={busy}
+        aria-label={confirming ? `Confirm removing ${name}` : `Remove ${name}`}
+        title={`Remove ${name}`}
+        className={cn(
+          "flex h-8 items-center justify-center rounded-full border transition-colors disabled:opacity-40",
+          confirming
+            ? "border-ember bg-ember px-3 text-xs font-medium text-white"
+            : "w-8 border-hairline hover:border-ember hover:text-ember",
+        )}
+      >
+        {confirming ? "Remove?" : <Icon icon={UserRemove01Icon} size={14} strokeWidth={1.8} />}
+      </button>
+    </span>
+  )
+}
+
+/**
  * Room chat and the participant list.
  *
  * Messages are carried by LiveKit's data channel — that is what makes them
@@ -105,6 +190,7 @@ export function ChatPanel({
   className?: string
 }) {
   const { getToken } = useAuth()
+  const { isHost } = useHostControls()
   const { localParticipant } = useLocalParticipant()
   const participants = useParticipants()
 
@@ -313,6 +399,13 @@ export function ChatPanel({
                     {participant.micOn ? "Mic on" : "Muted"}
                   </span>
                 </span>
+                {isHost && !participant.isLocal ? (
+                  <HostActions
+                    id={participant.id}
+                    name={participant.name}
+                    micOn={participant.micOn}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
