@@ -1,12 +1,12 @@
 services:
   postgres:
     image: postgres:17
-    container_name: meetos-postgres
+    container_name: meetup-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: meetos
-      POSTGRES_PASSWORD: meetos_dev_password
-      POSTGRES_DB: meetos
+      POSTGRES_USER: meetup
+      POSTGRES_PASSWORD: meetup_dev_password
+      POSTGRES_DB: meetup
     ports:
       - "5432:5432"
     volumes:
@@ -14,7 +14,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: meetos-redis
+    container_name: meetup-redis
     restart: unless-stopped
     ports:
       - "6379:6379"

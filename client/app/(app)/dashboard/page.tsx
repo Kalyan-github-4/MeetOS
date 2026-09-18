@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api"
 import { CreateMeetingForm } from "@/app/(app)/dashboard/create-meeting-form"
 
 export const metadata: Metadata = {
-  title: "Dashboard · MeetOS",
+  title: "Dashboard · MeetUp",
 }
 
 type MeetingsResponse = {

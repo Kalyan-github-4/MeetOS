@@ -32,7 +32,7 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       status: healthy ? "ok" : "degraded",
-      service: "MeetOS API",
+      service: "MeetUp API",
       dependencies,
     };
   });

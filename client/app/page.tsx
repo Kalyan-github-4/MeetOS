@@ -38,7 +38,7 @@ export default async function Home() {
     <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
       <header className="flex shrink-0 items-center gap-2.5 border-b border-hairline px-6 py-5 lg:px-14">
         <span className="size-1.5 rounded-full bg-ember" />
-        <span className="text-sm font-medium tracking-tight">MeetOS</span>
+        <span className="text-sm font-medium tracking-tight">MeetUp</span>
       </header>
 
       <div className="relative flex min-h-0 flex-1 items-center px-6 lg:px-14">

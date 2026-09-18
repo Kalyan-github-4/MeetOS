@@ -15,7 +15,7 @@ export type MediaPrefs = {
   audioOutputId?: string
 }
 
-const STORAGE_KEY = "meetos:media"
+const STORAGE_KEY = "meetup:media"
 
 /** Mic on, camera off: joining never surprises anyone with a video feed. */
 const DEFAULTS: MediaPrefs = { micOn: true, camOn: false }

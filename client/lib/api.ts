@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 /**
- * Calls the MeetOS API from a server component or route handler, forwarding the
+ * Calls the MeetUp API from a server component or route handler, forwarding the
  * caller's Clerk session token.
  *
  * Requests without a signed-in user are still sent — the API decides what

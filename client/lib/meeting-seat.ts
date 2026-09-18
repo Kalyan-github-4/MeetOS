@@ -16,7 +16,7 @@ export type StoredParticipant = {
 }
 
 function storageKey(code: string): string {
-  return `meetos:participant:${code}`
+  return `meetup:participant:${code}`
 }
 
 export function readParticipant(code: string): StoredParticipant | null {

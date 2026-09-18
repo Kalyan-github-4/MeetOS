@@ -8,7 +8,7 @@ import { LiveMeetingRoom } from "@/components/meeting/live-room"
 import { PreJoin } from "@/components/meeting/pre-join"
 
 export const metadata: Metadata = {
-  title: "Meeting Room · MeetOS",
+  title: "Meeting Room · MeetUp",
   description: "Live meeting room with video, screen share and chat.",
 }
 
@@ -55,7 +55,7 @@ export default async function MeetingRoomPage({
         code={code}
         title={meeting.title}
         subtitle={
-          meeting.host.name ? `${meeting.host.name}'s meeting` : "MeetOS meeting"
+          meeting.host.name ? `${meeting.host.name}'s meeting` : "MeetUp meeting"
         }
         sidePanels={sidePanels}
       />

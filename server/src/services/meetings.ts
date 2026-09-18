@@ -96,7 +96,7 @@ export async function getOrCreateActiveSession(
     .insert(meetingSessions)
     .values({
       meetingId: meeting.id,
-      livekitRoom: `meetos-${meeting.code}-${crypto.randomUUID().slice(0, 8)}`,
+      livekitRoom: `meetup-${meeting.code}-${crypto.randomUUID().slice(0, 8)}`,
     })
     .returning();
 

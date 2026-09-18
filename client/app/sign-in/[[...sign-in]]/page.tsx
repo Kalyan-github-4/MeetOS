@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { SignIn } from "@clerk/nextjs"
 
 export const metadata: Metadata = {
-  title: "Sign in · MeetOS",
+  title: "Sign in · MeetUp",
 }
 
 export default function SignInPage() {

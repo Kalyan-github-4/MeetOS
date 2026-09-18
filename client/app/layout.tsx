@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MeetOS",
+  title: "MeetUp",
   description: "Meetings that keep working after the call ends.",
 };
 

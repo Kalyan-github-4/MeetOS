@@ -261,7 +261,7 @@ function WaitingRoomRequests({ code }: { code: string }) {
   )
 }
 
-const LAYOUT_KEY = "meetos:layout"
+const LAYOUT_KEY = "meetup:layout"
 
 function readLayout(): RoomLayoutMode {
   try {

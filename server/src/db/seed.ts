@@ -12,7 +12,7 @@ async function seed(): Promise<void> {
     .insert(users)
     .values({
       clerkId: DEMO_CLERK_ID,
-      email: "host@meetos.dev",
+      email: "host@meetup.dev",
       name: "Casey Host",
     })
     .onConflictDoUpdate({
@@ -48,7 +48,7 @@ async function seed(): Promise<void> {
         .insert(meetingSessions)
         .values({
           meetingId: meeting.id,
-          livekitRoom: `meetos-${meeting.code}`,
+          livekitRoom: `meetup-${meeting.code}`,
         })
         .returning()
     )[0];
