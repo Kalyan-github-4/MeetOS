@@ -4,7 +4,12 @@ import { z } from "zod";
 import { env } from "../config/env.ts";
 
 import { issueGuestToken } from "../services/guest.ts";
-import { createMeetingToken } from "../services/livekit.ts";
+import {
+  closeRoom,
+  createMeetingToken,
+  muteMicrophone,
+  removeFromRoom,
+} from "../services/livekit.ts";
 import {
   addParticipant,
   countActiveParticipants,
@@ -18,7 +23,9 @@ import {
   listActiveParticipants,
   listMeetingsForHost,
   listOpenSessions,
+  listWaitingParticipants,
   markParticipantLeft,
+  setParticipantStatus,
   type MeetingSession,
   type Participant,
 } from "../services/meetings.ts";
@@ -47,6 +54,11 @@ function defaultTitle(hostName: string | null): string {
 
 const codeParams = z.object({
   code: z.string().trim().min(1).max(40),
+});
+
+const participantParams = codeParams.extend({
+  participantId: z.string().uuid(),
+  action: z.enum(["admit", "deny", "mute", "remove"]),
 });
 
 const messageBody = z.object({
@@ -83,6 +95,24 @@ async function resolveSeat(
   if (participant.leftAt) return { error: "You have left this meeting" };
 
   return { participant };
+}
+
+/**
+ * Why a seat that exists still cannot enter the call, or null if it can.
+ *
+ * The `reason` travels to the client so it can tell "keep waiting" apart from
+ * "you were turned away" without parsing a sentence.
+ */
+function admissionError(
+  participant: Participant,
+): { error: string; reason: "waiting" | "denied" } | null {
+  if (participant.status === "waiting") {
+    return { error: "Waiting for the host to let you in", reason: "waiting" };
+  }
+  if (participant.status === "denied") {
+    return { error: "The host did not let you in", reason: "denied" };
+  }
+  return null;
 }
 
 /**
@@ -173,11 +203,15 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const session = await getOrCreateActiveSession(meeting);
+    const isHost = user !== null && user.id === meeting.hostId;
     const participant = await addParticipant({
       sessionId: session.id,
       userId: user?.id ?? null,
       displayName,
-      role: user && user.id === meeting.hostId ? "host" : "guest",
+      role: isHost ? "host" : "guest",
+      // Everyone but the host knocks. The host is the only one who can open
+      // the door, so they must never be left standing outside it.
+      status: isHost ? "admitted" : "waiting",
     });
 
     return reply.code(201).send({
@@ -187,6 +221,7 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
         id: participant.id,
         displayName: participant.displayName,
         role: participant.role,
+        status: participant.status,
       },
       // Guests get a token so a reload keeps them as the same participant.
       guestToken: user
@@ -217,6 +252,10 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     const seat = await resolveSeat(request, session);
     if ("error" in seat) return reply.code(403).send({ error: seat.error });
     const { participant } = seat;
+
+    // A knocking guest polls this route; it is what opens once they are let in.
+    const blocked = admissionError(participant);
+    if (blocked) return reply.code(403).send(blocked);
 
     const token = await createMeetingToken({
       room: session.livekitRoom,
@@ -273,9 +312,12 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
 
     const session = await getOrCreateActiveSession(meeting);
 
-    // Only someone holding a seat may read the room's chat.
+    // Only someone in the call may read the room's chat — not someone still
+    // waiting to be let in.
     const seat = await resolveSeat(request, session);
     if ("error" in seat) return reply.code(403).send({ error: seat.error });
+    const blocked = admissionError(seat.participant);
+    if (blocked) return reply.code(403).send(blocked);
 
     const stored = await listMessagesForSession(session.id);
 
@@ -315,6 +357,8 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     const seat = await resolveSeat(request, session);
     if ("error" in seat) return reply.code(403).send({ error: seat.error });
     const { participant } = seat;
+    const blocked = admissionError(participant);
+    if (blocked) return reply.code(403).send(blocked);
 
     // The author is the caller's own seat, never a name from the body —
     // otherwise anyone could post as anyone.
@@ -356,7 +400,10 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
     if ("error" in seat) return reply.code(204).send();
 
     await markParticipantLeft(seat.participant.id);
-    await closeSessionIfEmpty(session);
+    // Someone giving up at the door never ends the call. Without this check a
+    // guest who arrived before the host, and left, would close the meeting
+    // before it began.
+    if (seat.participant.status === "admitted") await closeSessionIfEmpty(session);
 
     return reply.code(204).send();
   });
@@ -375,8 +422,102 @@ export async function meetingRoutes(app: FastifyInstance): Promise<void> {
 
     const open = await listOpenSessions(meeting.id);
     await endMeeting(meeting.id);
-    for (const session of open) await purgeMessagesForSession(session.id);
+    for (const session of open) {
+      await purgeMessagesForSession(session.id);
+      // The database already says the meeting is over, so nobody can get back
+      // in; this is what actually disconnects the people still in the call.
+      try {
+        await closeRoom(session.livekitRoom);
+      } catch (error) {
+        request.log.error({ err: error, room: session.livekitRoom }, "failed to close LiveKit room");
+      }
+    }
 
     return reply.code(204).send();
   });
+
+  /**
+   * The people knocking, for the host's admit/deny prompt.
+   *
+   * Polled by the host's browser. A waiting guest holds no LiveKit token, so
+   * there is no room event to push this over — and a few seconds of latency on
+   * a knock is what every waiting room has anyway.
+   */
+  app.get("/meetings/:code/waiting", { preHandler: app.requireAuth }, async (request, reply) => {
+    const params = codeParams.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid code" });
+
+    const meeting = await getMeetingByCode(params.data.code);
+    if (!meeting) return reply.code(404).send({ error: "Meeting not found" });
+    if (meeting.hostId !== request.user!.id) {
+      return reply.code(403).send({ error: "Only the host can see who is waiting" });
+    }
+
+    const [session] = await listOpenSessions(meeting.id);
+    const waiting = session ? await listWaitingParticipants(session.id) : [];
+
+    return {
+      participants: waiting.map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        joinedAt: p.joinedAt,
+      })),
+    };
+  });
+
+  /**
+   * The host's controls over one seat: let in or turn away someone waiting,
+   * and mute or remove someone in the call.
+   */
+  app.post(
+    "/meetings/:code/participants/:participantId/:action",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const params = participantParams.safeParse(request.params);
+      if (!params.success) return reply.code(400).send({ error: "Invalid request" });
+      const { code, participantId, action } = params.data;
+
+      const meeting = await getMeetingByCode(code);
+      if (!meeting) return reply.code(404).send({ error: "Meeting not found" });
+      if (meeting.hostId !== request.user!.id) {
+        return reply.code(403).send({ error: "Only the host can do that" });
+      }
+
+      const [session] = await listOpenSessions(meeting.id);
+      const target = await findParticipantById(participantId);
+
+      // The seat must belong to the call running now, so an id from a past
+      // session cannot be used to act on anything.
+      if (!session || !target || target.sessionId !== session.id || target.leftAt) {
+        return reply.code(404).send({ error: "That person is not in this meeting" });
+      }
+      if (target.role === "host") {
+        return reply.code(400).send({ error: "The host cannot be moderated" });
+      }
+
+      if (action === "admit" || action === "deny") {
+        if (target.status !== "waiting") {
+          return reply.code(409).send({ error: "That person is not waiting" });
+        }
+        await setParticipantStatus(target.id, action === "admit" ? "admitted" : "denied");
+        return reply.code(204).send();
+      }
+
+      if (target.status !== "admitted") {
+        return reply.code(409).send({ error: "That person is not in the call" });
+      }
+
+      if (action === "mute") {
+        await muteMicrophone(session.livekitRoom, target.id);
+        return reply.code(204).send();
+      }
+
+      // Recorded before the disconnect, so the removed browser's attempt to
+      // reconnect finds its seat already closed.
+      await setParticipantStatus(target.id, "removed");
+      await removeFromRoom(session.livekitRoom, target.id);
+      await closeSessionIfEmpty(session);
+      return reply.code(204).send();
+    },
+  );
 }

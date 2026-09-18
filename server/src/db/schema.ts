@@ -22,6 +22,18 @@ export const participantRole = pgEnum("participant_role", [
 ]);
 
 /**
+ * Where someone stands at the door. Everyone but the host starts `waiting` and
+ * is let in or turned away by the host; `removed` is someone the host took out
+ * of a running call. Existing rows predate the waiting room, hence the default.
+ */
+export const participantStatus = pgEnum("participant_status", [
+  "waiting",
+  "admitted",
+  "denied",
+  "removed",
+]);
+
+/**
  * Identity lives in Clerk. This table is the local mirror that meetings can
  * hold a foreign key to, kept in sync by Clerk webhooks — it is deliberately
  * not the source of truth for credentials.
@@ -110,6 +122,7 @@ export const participants = pgTable(
     }),
     displayName: text("display_name").notNull(),
     role: participantRole("role").notNull().default("guest"),
+    status: participantStatus("status").notNull().default("admitted"),
     joinedAt: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

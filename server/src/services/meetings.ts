@@ -12,6 +12,7 @@ import {
 export type Meeting = typeof meetings.$inferSelect;
 export type MeetingSession = typeof meetingSessions.$inferSelect;
 export type Participant = typeof participants.$inferSelect;
+export type ParticipantStatus = Participant["status"];
 
 const CODE_ATTEMPTS = 5;
 
@@ -114,6 +115,7 @@ export async function addParticipant(input: {
   userId: string | null;
   displayName: string;
   role: "host" | "cohost" | "guest";
+  status: ParticipantStatus;
 }): Promise<Participant> {
   const [participant] = await db
     .insert(participants)
@@ -123,6 +125,7 @@ export async function addParticipant(input: {
   return participant;
 }
 
+/** Who is in the call — admitted and not yet gone. */
 export async function listActiveParticipants(
   sessionId: string,
 ): Promise<Participant[]> {
@@ -132,10 +135,43 @@ export async function listActiveParticipants(
     .where(
       and(
         eq(participants.sessionId, sessionId),
+        eq(participants.status, "admitted"),
         isNull(participants.leftAt),
       ),
     )
     .orderBy(participants.joinedAt);
+}
+
+/** Who is knocking, longest-waiting first — the order the host sees them in. */
+export async function listWaitingParticipants(
+  sessionId: string,
+): Promise<Participant[]> {
+  return db
+    .select()
+    .from(participants)
+    .where(
+      and(
+        eq(participants.sessionId, sessionId),
+        eq(participants.status, "waiting"),
+        isNull(participants.leftAt),
+      ),
+    )
+    .orderBy(participants.joinedAt);
+}
+
+/**
+ * Moves someone through the door. `removed` also stamps `leftAt`, since they
+ * are no longer in the call; `denied` does not, so the person turned away can
+ * still be told so when they next ask — their seat is otherwise dead.
+ */
+export async function setParticipantStatus(
+  participantId: string,
+  status: ParticipantStatus,
+): Promise<void> {
+  await db
+    .update(participants)
+    .set(status === "removed" ? { status, leftAt: new Date() } : { status })
+    .where(eq(participants.id, participantId));
 }
 
 export async function findActiveParticipantForUser(
@@ -152,6 +188,9 @@ export async function findActiveParticipantForUser(
         isNull(participants.leftAt),
       ),
     )
+    // Asking again after being turned away creates a new seat; the newest one
+    // is the one that counts.
+    .orderBy(desc(participants.joinedAt))
     .limit(1);
 
   return rows[0] ?? null;
@@ -185,6 +224,7 @@ export async function countActiveParticipants(
     .where(
       and(
         eq(participants.sessionId, sessionId),
+        eq(participants.status, "admitted"),
         isNull(participants.leftAt),
       ),
     );

@@ -1,4 +1,9 @@
-import { AccessToken } from "livekit-server-sdk";
+import {
+  AccessToken,
+  RoomServiceClient,
+  ServerError,
+  TrackSource,
+} from "livekit-server-sdk";
 
 import { env } from "../config/env.ts";
 
@@ -38,4 +43,65 @@ export async function createMeetingToken(input: {
   });
 
   return token.toJwt();
+}
+
+/**
+ * Server-side control of running rooms. LiveKit's API is HTTP on the same host
+ * the browsers reach over WebSocket, so the scheme is all that changes.
+ */
+const rooms = new RoomServiceClient(
+  env.LIVEKIT_URL.replace(/^ws/, "http"),
+  env.LIVEKIT_API_KEY,
+  env.LIVEKIT_API_SECRET,
+);
+
+/** LiveKit answers "not found" once a room has emptied or a seat has gone. */
+function isNotFound(error: unknown): boolean {
+  return error instanceof ServerError && error.status === 404;
+}
+
+/**
+ * Closes a room, disconnecting everyone in it. Their clients see the room
+ * deleted, which is what lets them say "the host ended the meeting" rather
+ * than "connection lost". A room that is already gone is not an error.
+ */
+export async function closeRoom(room: string): Promise<void> {
+  try {
+    await rooms.deleteRoom(room);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+}
+
+/** Disconnects one participant. They can ask to come back through the door. */
+export async function removeFromRoom(room: string, identity: string): Promise<void> {
+  try {
+    await rooms.removeParticipant(room, identity);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+}
+
+/**
+ * Mutes someone's microphone. Returns false when there was nothing to mute.
+ *
+ * Muting only: turning a mic back on stays with its owner, the same courtesy
+ * every mainstream call app extends.
+ */
+export async function muteMicrophone(room: string, identity: string): Promise<boolean> {
+  let participant;
+  try {
+    participant = await rooms.getParticipant(room, identity);
+  } catch (error) {
+    if (isNotFound(error)) return false;
+    throw error;
+  }
+
+  const mic = participant.tracks.find(
+    (track) => track.source === TrackSource.MICROPHONE && !track.muted,
+  );
+  if (!mic) return false;
+
+  await rooms.mutePublishedTrack(room, identity, mic.sid, true);
+  return true;
 }
